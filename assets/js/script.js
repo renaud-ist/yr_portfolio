@@ -44,8 +44,6 @@ if ('IntersectionObserver' in window) {
   revealItems.forEach((item) => item.classList.add('visible'));
 }
 
-const countEls = document.querySelectorAll('[data-count]');
-
 const filterButtons = document.querySelectorAll('[data-filter]');
 const projectCards = document.querySelectorAll('.project-card[data-category]');
 
@@ -66,70 +64,17 @@ filterButtons.forEach((button) => {
   });
 });
 
-const animateCount = (el) => {
-  const target = Number(el.dataset.count);
-  if (!Number.isFinite(target) || target < 0) {
-    return;
-  }
-
-  const prefersReducedMotion = window.matchMedia
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  if (prefersReducedMotion) {
-    el.textContent = target;
-    return;
-  }
-
-  let start = 0;
-  const duration = 1200;
-  const stepTime = 30;
-  const increment = Math.ceil(target / (duration / stepTime));
-
-  const timer = setInterval(() => {
-    start += increment;
-    if (start >= target) {
-      el.textContent = target;
-      clearInterval(timer);
-      return;
-    }
-    el.textContent = start;
-  }, stepTime);
-};
-
-if ('IntersectionObserver' in window) {
-  const countObserver = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          animateCount(entry.target);
-          countObserver.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.6 }
-  );
-
-  countEls.forEach((el) => countObserver.observe(el));
-} else {
-  countEls.forEach((el) => animateCount(el));
-}
-
 const form = document.getElementById('contactForm');
 const statusBox = form ? form.querySelector('.form-status') : null;
 const API_BASE_URL = (() => {
   const host = window.location.hostname;
   const isLocal = host === '127.0.0.1' || host === 'localhost';
-  const isGitHubPages = host === 'renaud-ist.github.io';
 
   if (isLocal) {
     return 'http://127.0.0.1:8787';
   }
 
-  if (isGitHubPages) {
-    return 'https://myportfolio-api-proxy.yangdarenaud893.workers.dev';
-  }
-
-  return window.location.origin;
+  return 'https://myportfolio-api-proxy.yangdarenaud893.workers.dev';
 })();
 
 const safeText = (value) => value == null ? '' : String(value).replace(/\s+/g, ' ').trim();
@@ -208,11 +153,14 @@ if (form) {
       return;
     }
 
-    if (!name || !email || !message) {
+    if (!name || !email || !subject || !message) {
+      if (!statusBox) return;
       statusBox.classList.add('error');
-      statusBox.textContent = 'Please enter your name, email, and message.';
+      statusBox.textContent = 'Please complete every field before sending.';
       return;
     }
+
+    if (!statusBox || !submitButton) return;
 
     submitButton.disabled = true;
     submitButton.textContent = 'Sending...';
@@ -232,21 +180,23 @@ if (form) {
         body: JSON.stringify(payload),
       });
 
-      if (!result || result.ok !== true) {
+      if (!result || result.ok !== true || result.saved !== true || result.notificationCreated !== true) {
         throw new Error(result && (result.message || 'Message submission failed.'));
       }
 
       statusBox.classList.remove('error');
       statusBox.classList.add('success');
-      statusBox.textContent = result.message || 'Your message has been successfully sent.';
+      statusBox.textContent = result.emailSent === true
+        ? 'Thank you for your message. I will respond as soon as possible.'
+        : 'Your message was received successfully.';
       form.reset();
     } catch (error) {
       console.error('Contact form submission failed:', error);
       statusBox.classList.add('error');
-      statusBox.textContent = mapApiError(error, 'Something went wrong. Please try again.');
+      statusBox.textContent = 'Your message could not be sent. Please try again.';
     } finally {
       submitButton.disabled = false;
-      submitButton.textContent = 'Send message';
+      submitButton.textContent = 'Send Message';
     }
   });
 }
@@ -279,11 +229,13 @@ const notificationsStatus = document.getElementById('notificationsStatus');
 const searchStatus = document.getElementById('searchStatus');
 
 const storageKey = 'portfolio_admin_session';
+let replyStatusTimeout = null;
 
 const adminState = {
   token: null,
   user: null,
   notifications: [],
+  unreadNotificationCount: 0,
   conversations: [],
   archivedConversations: [],
   searchResults: [],
@@ -306,9 +258,23 @@ const setStatus = (element, text, type = '') => {
   element.textContent = text;
 };
 
+const showReplyStatus = (element, text, type = '') => {
+  setStatus(element, text, type);
+  const dismissButton = document.getElementById('replyStatusDismiss');
+  if (dismissButton) dismissButton.hidden = !text;
+  window.clearTimeout(replyStatusTimeout);
+
+  if (text && type) {
+    replyStatusTimeout = window.setTimeout(() => {
+      setStatus(element, '');
+      if (dismissButton) dismissButton.hidden = true;
+    }, 8000);
+  }
+};
+
 const readStoredSession = () => {
   try {
-    const raw = localStorage.getItem(storageKey);
+    const raw = sessionStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -316,12 +282,16 @@ const readStoredSession = () => {
 };
 
 const saveStoredSession = (session) => {
-  if (!session) {
-    localStorage.removeItem(storageKey);
-    return;
-  }
+  try {
+    if (!session) {
+      sessionStorage.removeItem(storageKey);
+      return;
+    }
 
-  localStorage.setItem(storageKey, JSON.stringify(session));
+    sessionStorage.setItem(storageKey, JSON.stringify(session));
+  } catch (error) {
+    console.warn('Admin session could not be stored for this tab:', error);
+  }
 };
 
 
@@ -370,6 +340,7 @@ const clearAdminSession = () => {
   adminState.token = null;
   adminState.user = null;
   adminState.notifications = [];
+  adminState.unreadNotificationCount = 0;
   adminState.conversations = [];
   adminState.archivedConversations = [];
   adminState.searchResults = [];
@@ -419,8 +390,30 @@ const clearAdminSession = () => {
   renderSearchResults();
 };
 
+const isConversationUnread = (conversation) => {
+  if (Object.prototype.hasOwnProperty.call(conversation, 'is_read')) {
+    return [false, 0, '0', 'false', null].includes(conversation.is_read);
+  }
+
+  return Object.prototype.hasOwnProperty.call(conversation, 'read_at')
+    && conversation.read_at === null;
+};
+
+const getConversation = (conversationId) => [
+  ...adminState.conversations,
+  ...adminState.archivedConversations,
+].find((conversation) => String(conversation.id || conversation.conversation_id) === String(conversationId));
+
+const isNotificationRead = (notification) => {
+  if (Object.prototype.hasOwnProperty.call(notification, 'is_read')) {
+    return [true, 1, '1', 'true'].includes(notification.is_read);
+  }
+  return Object.prototype.hasOwnProperty.call(notification, 'read_at')
+    && notification.read_at !== null;
+};
+
 const renderNotificationCount = () => {
-  const count = adminState.notifications.length;
+  const count = adminState.unreadNotificationCount;
 
   if (notificationCount) {
     notificationCount.textContent = String(count);
@@ -431,6 +424,9 @@ const renderNotificationCount = () => {
     notificationsNavCount.textContent = String(count);
     notificationsNavCount.hidden = count === 0;
   }
+
+  const markAllButton = document.getElementById('markAllNotificationsReadBtn');
+  if (markAllButton) markAllButton.disabled = count === 0;
 };
 
 const renderAdminState = () => {
@@ -529,7 +525,7 @@ const renderConversationCard = (conversation, archived = false) => {
           class="button button-primary admin-conversation-open"
           data-open-conversation="${escapeHtml(id || '')}"
         >
-          Open
+          Open conversation
         </button>
 
         ${
@@ -644,6 +640,7 @@ const renderConversationList = () => {
         <p>No active conversations were found.</p>
       </div>
     `;
+    renderNotificationCount();
     return;
   }
 
@@ -652,6 +649,7 @@ const renderConversationList = () => {
     .join('');
 
   attachConversationListActions(adminInboxList);
+  renderNotificationCount();
 };
 
 const renderArchivedList = () => {
@@ -664,6 +662,7 @@ const renderArchivedList = () => {
         <p>Archived conversations will appear here.</p>
       </div>
     `;
+    renderNotificationCount();
     return;
   }
 
@@ -672,6 +671,7 @@ const renderArchivedList = () => {
     .join('');
 
   attachConversationListActions(adminArchivedList);
+  renderNotificationCount();
 };
 
 const loadConversations = async (archived = false) => {
@@ -972,9 +972,14 @@ const renderConversation = () => {
 
         <div class="reply-actions">
           <button type="button" id="sendReplyBtn" class="button button-primary">
-            Reply
+            Send Reply
           </button>
-          <p id="replyStatus" class="inline-status" aria-live="polite"></p>
+          <div class="reply-feedback">
+            <p id="replyStatus" class="inline-status" role="status" aria-live="polite"></p>
+            <button type="button" id="replyStatusDismiss" class="reply-status-dismiss" aria-label="Dismiss reply status" title="Dismiss reply status" hidden>
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1002,6 +1007,10 @@ const renderConversation = () => {
     'click',
     () => sendReply(conversation.id)
   );
+
+  document.getElementById('replyStatusDismiss')?.addEventListener('click', () => {
+    showReplyStatus(document.getElementById('replyStatus'), '');
+  });
 };
 
 const updateConversation = async (conversationId, changes) => {
@@ -1140,7 +1149,7 @@ const sendReply = async (conversationId) => {
       }
     );
 
-    if (!result || !result.ok) {
+    if (!result || result.ok !== true || result.saved !== true) {
       throw new Error(result?.error || 'Reply failed.');
     }
 
@@ -1153,14 +1162,23 @@ const sendReply = async (conversationId) => {
       fetchNotifications(),
     ]);
 
-    setStatus(replyStatus, 'Reply sent successfully.', 'success');
+    showReplyStatus(
+      replyStatus,
+      result.saved === true && result.emailSent === true
+        ? 'Your message has been successfully sent.'
+        : 'Reply saved, but email could not be delivered.',
+      'success'
+    );
   } catch (error) {
     console.error('Reply failed:', error);
 
-    setStatus(
+    const saved = error.payload?.saved === true;
+    showReplyStatus(
       replyStatus,
-      mapApiError(error, 'The reply could not be sent.'),
-      'error'
+      saved
+        ? 'Reply saved, but email could not be delivered.'
+        : 'Message could not be sent. Please try again.',
+      saved ? 'success' : 'error'
     );
   } finally {
     replyButton.disabled = false;
@@ -1200,8 +1218,19 @@ const renderNotifications = () => {
           class="button button-primary"
           data-notification-open="${escapeHtml(item.conversation_id || '')}"
         >
-          Open
+          Open conversation
         </button>
+
+        ${item.conversation_id ? `
+          <button
+            type="button"
+            class="button button-secondary"
+            data-notification-read="${escapeHtml(item.id)}"
+            ${isNotificationRead(item) ? 'disabled' : ''}
+          >
+              ${isNotificationRead(item) ? 'Notification read' : 'Mark notification read'}
+          </button>
+        ` : ''}
 
         <button
           type="button"
@@ -1240,6 +1269,17 @@ const renderNotifications = () => {
     }
   );
 
+  notificationList.querySelectorAll('[data-notification-read]').forEach(
+    (button) => {
+      button.addEventListener('click', async () => {
+        const notificationId = button.getAttribute('data-notification-read');
+        if (notificationId) {
+          await markNotificationRead(notificationId);
+        }
+      });
+    }
+  );
+
   renderNotificationCount();
 };
 
@@ -1269,12 +1309,13 @@ const fetchNotifications = async () => {
       : Array.isArray(data?.notifications)
         ? data.notifications
         : [];
+    adminState.unreadNotificationCount = Number(result.unread_count || 0);
 
     renderNotifications();
 
     setStatus(
       notificationsStatus,
-      `${adminState.notifications.length} notification${adminState.notifications.length === 1 ? '' : 's'} loaded.`,
+      `${adminState.notifications.length} notification${adminState.notifications.length === 1 ? '' : 's'} loaded; ${adminState.unreadNotificationCount} unread.`,
       'success'
     );
 
@@ -1289,6 +1330,45 @@ const fetchNotifications = async () => {
     );
 
     return false;
+  }
+};
+
+const markNotificationRead = async (notificationId) => {
+  if (!notificationId || !adminState.token) return false;
+
+  try {
+    await apiRequest(`${API_BASE_URL}/api/notifications?id=${encodeURIComponent(notificationId)}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${adminState.token}` },
+    });
+    await fetchNotifications();
+    return true;
+  } catch (error) {
+    console.error('Notification read update failed:', error);
+    setStatus(notificationsStatus, mapApiError(error, 'Unable to mark notification as read.'), 'error');
+    return false;
+  }
+};
+
+const markAllNotificationsRead = async () => {
+  if (!adminState.token) return false;
+
+  const button = document.getElementById('markAllNotificationsReadBtn');
+  if (button) button.disabled = true;
+
+  try {
+    await apiRequest(`${API_BASE_URL}/api/notifications/read-all`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminState.token}` },
+    });
+    await fetchNotifications();
+    return true;
+  } catch (error) {
+    console.error('Mark all notifications read failed:', error);
+    setStatus(notificationsStatus, mapApiError(error, 'Unable to mark notifications as read.'), 'error');
+    return false;
+  } finally {
+    renderNotificationCount();
   }
 };
 
@@ -1415,6 +1495,11 @@ document.getElementById('refreshArchivedBtn')?.addEventListener(
 document.getElementById('refreshNotificationsBtn')?.addEventListener(
   'click',
   () => fetchNotifications()
+);
+
+document.getElementById('markAllNotificationsReadBtn')?.addEventListener(
+  'click',
+  () => markAllNotificationsRead()
 );
 
 document.getElementById('conversationBackBtn')?.addEventListener(

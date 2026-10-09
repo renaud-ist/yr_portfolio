@@ -2,3 +2,5 @@ User-agent: *
 Allow: /
 Disallow: /assets/php/admin.php
 Disallow: /.env
+Disallow: /assets/php/
+Disallow: /tests/

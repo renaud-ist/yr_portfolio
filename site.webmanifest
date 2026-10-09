@@ -1,7 +1,7 @@
 {
-  "name": "YRD Information Systems",
-  "short_name": "YRD Site",
-  "start_url": "index.php",
+  "name": "yr_portfolio | Yangda Renaud Dimanche",
+  "short_name": "yr_portfolio",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#071521",
   "theme_color": "#6cc7ff",
