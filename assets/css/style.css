@@ -30,6 +30,10 @@ footer[id] {
   scroll-margin-top: 110px;
 }
 
+.anchor-highlight {
+  animation: anchorTargetHighlight 2s ease-out;
+}
+
 body {
   margin: 0;
   position: relative;
@@ -716,18 +720,33 @@ a:focus-visible {
 }
 
 .edu-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(120px, 0.4fr) minmax(0, 1fr);
   align-items: center;
   gap: 18px;
 }
 
-.edu-card img {
-  width: 90px;
-  height: 90px;
+img.university-logo,
+img.nkumba-logo {
+  display: block;
+  flex: 0 1 auto;
+  width: auto;
+  height: auto;
+  max-width: 120px;
+  max-height: 120px;
   object-fit: contain;
-  border-radius: 15px;
+  object-position: center;
+  image-rendering: auto;
+  border-radius: 0;
   background: rgba(255,255,255,0.04);
-  padding: 12px;
+  padding: 0;
+  align-self: center;
+  justify-self: center;
+  transform: none;
+  filter: none;
+  opacity: 1;
+  animation: none;
+  transition: none;
 }
 
 .footer {
@@ -1105,6 +1124,12 @@ a:focus-visible {
   transform: translateY(0);
 }
 
+.js .education.reveal {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
 @keyframes atmosphereShift {
   0% {
     background-position: 0% 0%, 100% 0%, 0% 50%;
@@ -1132,6 +1157,15 @@ a:focus-visible {
   }
 }
 
+@keyframes anchorTargetHighlight {
+  0%, 45% {
+    background-color: rgba(255, 226, 122, 0.14);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -1143,7 +1177,6 @@ a:focus-visible {
   .stat-item,
   .tool-list a,
   .card-actions a,
-    font-size: 16px;
   .social-link {
     transition: none;
     transform: none;
@@ -1152,8 +1185,13 @@ a:focus-visible {
   body,
   .brand-mark,
   .button-primary,
-  .hero-copy h1 span {
+  .hero-copy h1 span,
+  .anchor-highlight {
     animation: none;
+  }
+
+  .anchor-highlight {
+    background-color: rgba(255, 226, 122, 0.14);
   }
 
   body::before {
@@ -1228,8 +1266,8 @@ a:focus-visible {
   }
 
   .edu-card {
-    flex-direction: column;
-    align-items: flex-start;
+    grid-template-columns: 1fr;
+    text-align: center;
   }
 
   .footer-grid {

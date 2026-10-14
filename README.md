@@ -70,10 +70,10 @@ Keep these three files available at the exact case-sensitive paths used in `inde
 | Career track | File |
 | --- | --- |
 | IT Support / Help Desk / Technical Support | `resume/Yangda_Renaud_IT_Support_CV.pdf` |
-| Administrative Assistant / Office Assistant | `resume/Yangda_Renaud_Administrative_Assistant_CV.pdf` |
+| Administrative Assistant / Office Assistant | `resume/Yangda_Renaud_Admin_Assistant_CV.pdf` |
 | Data Entry / Records Clerk / Office Clerk | `resume/Yangda_Renaud_Data_Entry_CV.pdf` |
 
-Each has an equal card, role description, and explicit download action. The former local file `Yangda_Renaud_Admin_Assistant_CV.pdf` was renamed to the required `Administrative_Assistant` filename. Compare all three PDF contents before publishing: verify contact details, degree names/dates, role-specific summaries, employment/volunteer claims, and spelling. PDF presence and browser opening were checked; text-level consistency was not verified.
+Each has an equal card, role description, and explicit download action. The Administrative Assistant CV uses the existing `Yangda_Renaud_Admin_Assistant_CV.pdf` filename. Compare all three PDF contents before publishing: verify contact details, degree names/dates, role-specific summaries, employment/volunteer claims, and spelling. PDF presence and browser opening were checked; text-level consistency was not verified.
 
 ## Contact Form Configuration
 

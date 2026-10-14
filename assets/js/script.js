@@ -44,6 +44,76 @@ if ('IntersectionObserver' in window) {
   revealItems.forEach((item) => item.classList.add('visible'));
 }
 
+let anchorNavigationCleanup = null;
+let anchorHighlightTimer = null;
+
+document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+  anchor.addEventListener('click', function (event) {
+    const target = document.querySelector(this.getAttribute('href'));
+    if (!target) return;
+
+    event.preventDefault();
+
+    const stickyHeader = document.querySelector('.topbar');
+    const stickyOffset = stickyHeader
+      ? Math.ceil(stickyHeader.getBoundingClientRect().height + 60)
+      : 16;
+    target.style.scrollMarginTop = `${stickyOffset}px`;
+
+    if (window.location.hash !== this.getAttribute('href')) {
+      window.history.pushState(null, '', this.getAttribute('href'));
+    }
+
+    if (anchorNavigationCleanup) anchorNavigationCleanup();
+
+    let settleTimer = null;
+    const cleanup = () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scrollend', finishNavigation);
+      window.clearTimeout(settleTimer);
+      if (anchorNavigationCleanup === cleanup) anchorNavigationCleanup = null;
+    };
+    const finishNavigation = () => {
+      if (anchorNavigationCleanup !== cleanup) return;
+      const headerBottom = stickyHeader?.getBoundingClientRect().bottom || 0;
+      const targetTop = target.getBoundingClientRect().top;
+      const expectedTop = Number.parseFloat(getComputedStyle(target).scrollMarginTop) || stickyOffset;
+      const heading = target.querySelector('h1, h2, h3');
+      const headingTop = heading?.getBoundingClientRect().top ?? targetTop;
+      if (Math.abs(targetTop - expectedTop) > 48
+        || targetTop < headerBottom + 8
+        || headingTop < headerBottom + 8
+        || headingTop >= window.innerHeight) return;
+
+      cleanup();
+      target.classList.remove('anchor-highlight');
+      void target.offsetWidth;
+      target.classList.add('anchor-highlight');
+      window.clearTimeout(anchorHighlightTimer);
+      anchorHighlightTimer = window.setTimeout(
+        () => target.classList.remove('anchor-highlight'),
+        2000
+      );
+    };
+    const handleScroll = () => {
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(finishNavigation, 150);
+    };
+
+    anchorNavigationCleanup = cleanup;
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    if ('onscrollend' in document) {
+      document.addEventListener('scrollend', finishNavigation);
+    }
+
+    target.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+    handleScroll();
+  });
+});
+
 const filterButtons = document.querySelectorAll('[data-filter]');
 const projectCards = document.querySelectorAll('.project-card[data-category]');
 
