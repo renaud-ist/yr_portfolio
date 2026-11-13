@@ -80,7 +80,7 @@ Each has an equal card, role description, and explicit download action. The Admi
 The browser handler in `assets/js/script.js` validates name, email, subject, and message, reads a honeypot field, and POSTs JSON to:
 
 ```text
-POST https://myportfolio-api-proxy.yangdarenaud893.workers.dev/api/contact
+POST https://yr-portfolio-api-proxy.yangdarenaud893.workers.dev/api/contact
 Content-Type: application/json
 { "name": "...", "email": "...", "subject": "...", "message": "..." }
 ```
